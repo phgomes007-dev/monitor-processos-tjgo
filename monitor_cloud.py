@@ -1,3 +1,5 @@
+cd ~/desktop/monitor-processos-tjgo
+cat > monitor_cloud.py << 'EOF'
 import json
 import requests
 import os
@@ -46,7 +48,7 @@ class ConsultaProjudiReal:
         """Configura o navegador Chrome para GitHub Actions"""
         print("🖥️ Configurando navegador...")
         chrome_options = Options()
-        chrome_options.add_argument("--headless")  # Executa em background
+        chrome_options.add_argument("--headless")
         chrome_options.add_argument("--no-sandbox")
         chrome_options.add_argument("--disable-dev-shm-usage")
         chrome_options.add_argument("--disable-gpu")
@@ -61,78 +63,93 @@ class ConsultaProjudiReal:
             print(f"❌ Erro ao configurar navegador: {e}")
             raise e
     
+    def tentar_encontrar_campo(self):
+        """Tenta diferentes seletores para encontrar o campo de busca"""
+        seletores = [
+            (By.NAME, "numeroProcesso"),
+            (By.ID, "numeroProcesso"),
+            (By.CSS_SELECTOR, "input[name='numeroProcesso']"),
+            (By.CSS_SELECTOR, "input[placeholder*='processo']"),
+            (By.CSS_SELECTOR, "input[type='text']"),
+            (By.CSS_SELECTOR, "input"),
+            (By.XPATH, "//input[contains(@name, 'processo')]"),
+            (By.XPATH, "//input[contains(@placeholder, 'processo')]")
+        ]
+        
+        for by, seletor in seletores:
+            try:
+                print(f"🔍 Tentando seletor: {by}='{seletor}'")
+                elemento = WebDriverWait(self.driver, 5).until(
+                    EC.presence_of_element_located((by, seletor))
+                )
+                print(f"✅ Campo encontrado com: {by}='{seletor}'")
+                return elemento
+            except:
+                continue
+        
+        # Se não encontrou, mostrar página para debug
+        print("❌ Nenhum seletor funcionou. HTML da página:")
+        print(self.driver.page_source[:1000])  # Primeiros 1000 chars
+        return None
+    
     def consultar_processo(self, numero_processo):
-        """Faz consulta REAL no Projudi TJGO - FASE 1"""
+        """Faz consulta REAL no Projudi TJGO - Versão melhorada"""
         try:
             print(f"🔍 Consultando processo REAL: {numero_processo}")
             
             # 1. Acessar o Projudi
             print("🌐 Acessando Projudi TJGO...")
             self.driver.get("https://projudi.tjgo.jus.br/Projudi/")
-            time.sleep(3)
+            time.sleep(5)  # Mais tempo para carregar
             
-            # 2. Localizar e preencher campo de busca
+            print(f"📄 Página carregada: {self.driver.title}")
+            print(f"🔗 URL atual: {self.driver.current_url}")
+            
+            # 2. Tentar encontrar campo de busca
+            campo_busca = self.tentar_encontrar_campo()
+            if not campo_busca:
+                return {"status": "ERRO", "detalhes": "Campo de busca não encontrado"}
+            
+            # 3. Preencher campo
             print("⌨️ Preenchendo número do processo...")
-            campo_busca = WebDriverWait(self.driver, 15).until(
-                EC.presence_of_element_located((By.NAME, "numeroProcesso"))
-            )
             campo_busca.clear()
             campo_busca.send_keys(numero_processo)
             time.sleep(2)
             
-            # 3. Clicar em buscar
-            print("🔎 Clicando em buscar...")
-            botoes_busca = [
-                "input[type='submit']",
-                "button[type='submit']", 
-                "input[value*='Buscar']",
-                "input[value*='buscar']",
-                ".btn",
-                "button"
-            ]
-            
-            botao_encontrado = False
-            for seletor in botoes_busca:
-                try:
-                    botao = self.driver.find_element(By.CSS_SELECTOR, seletor)
-                    botao.click()
-                    botao_encontrado = True
-                    print(f"✅ Botão encontrado: {seletor}")
-                    break
-                except:
-                    continue
-            
-            if not botao_encontrado:
-                # Tentar enviar formulário com Enter
+            # 4. Tentar enviar formulário
+            print("🔎 Enviando busca...")
+            try:
                 from selenium.webdriver.common.keys import Keys
                 campo_busca.send_keys(Keys.RETURN)
                 print("✅ Busca enviada com Enter")
+            except Exception as e:
+                print(f"❌ Erro ao enviar com Enter: {e}")
+                return {"status": "ERRO", "detalhes": f"Erro ao enviar busca: {e}"}
             
-            # 4. Aguardar e analisar resultados
+            # 5. Aguardar resultados
             print("⏳ Aguardando resultados...")
             time.sleep(5)
             
-            pagina_html = self.driver.page_source
-            pagina_texto = self.driver.find_element(By.TAG_NAME, "body").text
+            print(f"🔗 Nova URL: {self.driver.current_url}")
+            pagina_texto = self.driver.find_element(By.TAG_NAME, "body").text.lower()
             
-            print(f"📄 Tamanho da página: {len(pagina_html)} caracteres")
+            print("📊 Analisando resultado...")
             
-            # 5. Analisar resultado
-            if "nenhum processo encontrado" in pagina_texto.lower():
+            # 6. Analisar resultado
+            if "nenhum processo encontrado" in pagina_texto:
                 return {"status": "NÃO ENCONTRADO", "detalhes": "Processo não existe no sistema"}
             
-            if "processo não localizado" in pagina_texto.lower():
+            if "processo não localizado" in pagina_texto:
                 return {"status": "NÃO LOCALIZADO", "detalhes": "Processo não foi localizado"}
             
-            if numero_processo.replace('.', '').replace('-', '') in pagina_texto.replace('.', '').replace('-', ''):
+            if numero_processo.replace('.', '').replace('-', '') in self.driver.page_source.replace('.', '').replace('-', ''):
                 return {
                     "status": "ENCONTRADO", 
                     "detalhes": "Processo localizado no Projudi",
-                    "consulta": datetime.now().strftime('%d/%m/%Y %H:%M'),
-                    "pagina_tamanho": len(pagina_html)
+                    "consulta": datetime.now().strftime('%d/%m/%Y %H:%M')
                 }
             else:
-                return {"status": "INDETERMINADO", "detalhes": "Não foi possível confirmar se processo existe"}
+                return {"status": "INDETERMINADO", "detalhes": "Não foi possível confirmar"}
                 
         except Exception as e:
             return {"status": "ERRO", "detalhes": f"Erro técnico: {str(e)}"}
@@ -151,9 +168,9 @@ try:
     processo = "5650304-47.2025.8.09.0168"
     resultado = consulta.consultar_processo(processo)
     
-    print(f"📊 Resultado: {resultado}")
+    print(f"📊 Resultado final: {resultado}")
     
-    # Preparar mensagem para Telegram
+    # Preparar mensagem
     mensagem = f"🔍 <b>CONSULTA REAL PROJUDI</b>\n\n"
     mensagem += f"📅 {datetime.now().strftime('%d/%m/%Y %H:%M')}\n"
     mensagem += f"⚡ GitHub Actions + Selenium\n\n"
@@ -161,22 +178,18 @@ try:
     mensagem += f"<b>Status:</b> {resultado['status']}\n"
     mensagem += f"<b>Detalhes:</b> {resultado['detalhes']}\n"
     
-    if resultado.get('pagina_tamanho'):
-        mensagem += f"<b>Página:</b> {resultado['pagina_tamanho']} chars\n"
-    
-    mensagem += f"\n🏁 <i>Fase 1 - Consulta básica concluída</i>"
+    mensagem += f"\n🏁 <i>Fase 1 - Consulta básica</i>"
     
     # Enviar para Telegram
     if telegram.enviar_mensagem(mensagem):
-        print("✅✅✅ CONSULTA REAL ENVIADA PARA TELEGRAM!")
+        print("✅✅✅ RESULTADO ENVIADO PARA TELEGRAM!")
     else:
-        print("❌❌❌ FALHA NO ENVIO DO RESULTADO")
+        print("❌❌❌ FALHA NO ENVIO")
     
     consulta.close()
     
 except Exception as e:
     print(f"❌❌❌ ERRO CRÍTICO: {e}")
-    # Tentar enviar erro para Telegram
     try:
         telegram = TelegramCloud()
         erro_msg = f"🚨 <b>ERRO NA CONSULTA</b>\n\nErro: {str(e)}\n\n📅 {datetime.now().strftime('%d/%m/%Y %H:%M')}"
@@ -185,3 +198,8 @@ except Exception as e:
         pass
 
 print("=== CONSULTA REAL FINALIZADA ===")
+EOF
+
+git add monitor_cloud.py
+git commit -m "Fase 1: Melhorar busca de elementos com múltiplos seletores"
+git push
