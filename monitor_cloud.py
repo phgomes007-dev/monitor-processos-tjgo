@@ -196,5 +196,5 @@ else:
     print("❌ Falha no envio")
 
 print("=== CONSULTA FINALIZADA ===")
-EOF
+
 
