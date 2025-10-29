@@ -1,5 +1,3 @@
-cd ~/desktop/monitor-processos-tjgo
-cat > monitor_cloud.py << 'EOF'
 import json
 import requests
 import os
@@ -198,8 +196,3 @@ except Exception as e:
         pass
 
 print("=== CONSULTA REAL FINALIZADA ===")
-EOF
-
-git add monitor_cloud.py
-git commit -m "Fase 1: Melhorar busca de elementos com múltiplos seletores"
-git push
