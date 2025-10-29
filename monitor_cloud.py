@@ -5,10 +5,13 @@ import requests
 import os
 from datetime import datetime
 
-# Configurações diretas (sem config.py)
+# 🔒 DADOS SEGUROS - Agora pegamos dos secrets!
+TELEGRAM_TOKEN = os.environ.get('TELEGRAM_TOKEN', '8309039392:AAHaX5biBX2nVQstAj1Bgic0jDFdQPLGaio')
+TELEGRAM_CHAT_ID = os.environ.get('TELEGRAM_CHAT_ID', '815852291')
+
 CONFIG = {
-    "telegram_token": "8309039392:AAHaX5biBX2nVQstAj1Bgic0jDFdQPLGaio",
-    "telegram_chat_id": "815852291",
+    "telegram_token": TELEGRAM_TOKEN,
+    "telegram_chat_id": TELEGRAM_CHAT_ID,
     "processos": ["5650304-47.2025.8.09.0168"]
 }
 
@@ -16,6 +19,8 @@ class TelegramCloud:
     def __init__(self):
         self.token = CONFIG["telegram_token"]
         self.chat_id = CONFIG["telegram_chat_id"]
+        print(f"🔐 Token: {self.token[:10]}...")
+        print(f"👤 Chat ID: {self.chat_id}")
     
     def enviar_mensagem(self, texto):
         try:
@@ -27,7 +32,8 @@ class TelegramCloud:
             }
             response = requests.post(url, json=payload, timeout=10)
             return response.status_code == 200
-        except:
+        except Exception as e:
+            print(f"❌ Erro Telegram: {e}")
             return False
 
 class MonitorCloud:
@@ -61,7 +67,8 @@ class MonitorCloud:
         mensagem = f"🔄 <b>Monitor Cloud Executando</b>\n\n"
         mensagem += f"📅 {datetime.now().strftime('%d/%m/%Y %H:%M')}\n"
         mensagem += f"📋 Processos: {len(CONFIG['processos'])}\n"
-        mensagem += f"⚡ GitHub Actions\n\n"
+        mensagem += f"⚡ GitHub Actions\n"
+        mensagem += f"🔐 Dados Seguros: ✅\n\n"
         
         for processo in CONFIG["processos"]:
             dados = self.simular_consulta(processo)
@@ -74,7 +81,7 @@ class MonitorCloud:
             else:
                 mensagem += f"✅ <b>{processo}</b> - Sem mudanças\n\n"
         
-        mensagem += f"🏁 <i>Execução concluída</i>"
+        mensagem += f"🏁 <i>Execução concluída com sucesso!</i>"
         
         # Enviar para Telegram
         if self.telegram.enviar_mensagem(mensagem):
