@@ -1,5 +1,3 @@
-cd ~/desktop/monitor-processos-tjgo
-cat > monitor_cloud.py << 'EOF'
 import json
 import requests
 import os
@@ -196,5 +194,3 @@ else:
     print("❌ Falha no envio")
 
 print("=== CONSULTA FINALIZADA ===")
-
-
