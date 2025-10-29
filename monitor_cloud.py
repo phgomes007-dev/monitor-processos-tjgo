@@ -2,29 +2,23 @@ name: Monitor de Processos TJGO
 
 on:
   schedule:
-    # Executa todo dia às 9h e 15h (horário UTC -3 = Brasil)
-    - cron: '0 12 * * *'  # 9h Brasil (12h UTC)
-    - cron: '0 18 * * *'  # 15h Brasil (18h UTC)
-  workflow_dispatch:       # Permite executar manualmente
+    - cron: '0 12 * * *'
+    - cron: '0 18 * * *'
+  workflow_dispatch:
 
 jobs:
   monitor:
     runs-on: ubuntu-latest
-    
     steps:
     - name: 📥 Baixar código
       uses: actions/checkout@v3
-      
     - name: 🐍 Configurar Python
       uses: actions/setup-python@v4
       with:
         python-version: '3.9'
-        
     - name: 📦 Instalar dependências
       run: pip install -r requirements.txt
-      
     - name: 🚀 Executar monitor
       run: python monitor_cloud.py
-      
     - name: ✅ Finalizado
       run: echo "Monitoramento executado com sucesso!"
